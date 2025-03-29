@@ -19,21 +19,21 @@ public class DockerDemo {
 //        PingCmd pingCmd = dockerClient.pingCmd();
 //        pingCmd.exec();
         String image = "nginx:latest";
-//        //1. 拉取镜像
-//        PullImageCmd pullImageCmd = dockerClient.pullImageCmd(image);
-//        //拉取之后的回调函数，因为拉取可能要很长时间
-//        PullImageResultCallback pullImageResultCallback = new PullImageResultCallback(){
-//            @Override
-//            public void onNext(PullResponseItem item) {
-//                System.out.println("下载镜像的状态：" + item.getStatus());
-//                super.onNext(item);
-//            }
-//        };
-//        //执行拉取镜像的操作
-//        pullImageCmd
-//                .exec(pullImageResultCallback)
-//                .awaitCompletion();//await的作用是阻塞，直到下载完成才会执行下一步操作
-//        System.out.println("下载完成");
+        //1. 拉取镜像
+        PullImageCmd pullImageCmd = dockerClient.pullImageCmd(image);
+        //拉取之后的回调函数，因为拉取可能要很长时间
+        PullImageResultCallback pullImageResultCallback = new PullImageResultCallback(){
+            @Override
+            public void onNext(PullResponseItem item) {
+                System.out.println("下载镜像的状态：" + item.getStatus());
+                super.onNext(item);
+            }
+        };
+        //执行拉取镜像的操作
+        pullImageCmd
+                .exec(pullImageResultCallback)
+                .awaitCompletion();//await的作用是阻塞，直到下载完成才会执行下一步操作
+        System.out.println("下载完成");
 
         //2. 创建容器
         CreateContainerCmd containerCmd = dockerClient.createContainerCmd(image);//创建容器的命令
