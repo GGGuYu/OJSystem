@@ -3,9 +3,6 @@ package com.yupi.yuojcodesandbox;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.ArrayUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.dfa.FoundWord;
-import cn.hutool.dfa.WordTree;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.*;
@@ -15,7 +12,11 @@ import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeRequest;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeResponse;
 import com.yupi.yuojcodesandbox.model.ExecuteMessage;
+import com.yupi.yuojcodesandbox.model.JudgeInfo;
+import com.yupi.yuojcodesandbox.utils.ExecuteMsg2Response;
+import com.yupi.yuojcodesandbox.utils.ProcessUtils;
 import org.springframework.util.StopWatch;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -23,20 +24,68 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate{
+public class JavaDockerCodeSandboxOld implements CodeSandbox {
+
+    private static final String GLOBAL_CODE_DIR_NANE = "tmpCode";
+
+    private static final String GLOBAL_JAVA_CLASS_NAME = "Main.java";
+
+    private static final String COMPILE_CODE_CMD_PRO = "javac -encoding utf-8 ";
 
     private static final long TIME_OUT = 5000L;
 
+//    private static  Boolean first_init = true;
     private static  Boolean first_init = false;
 
+    private ProcessUtils processUtils;
+
+    //测试程序
+    public static void main(String[] args) {
+        JavaDockerCodeSandboxOld javaNativeCodeSandbox = new JavaDockerCodeSandboxOld();
+        //构造请求体
+        ExecuteCodeRequest executeCodeRequest = new ExecuteCodeRequest();
+        executeCodeRequest.setInputList(Arrays.asList("1 2" , "1 3"));
+        //读取一个代码文件
+        //hutool的一个工具类，可以以Str读取resouce下的文件
+        String code = ResourceUtil.readStr("testCode/simpleComputeArgs/SimpleCompute.java", StandardCharsets.UTF_8);
+        executeCodeRequest.setCode(code);
+        executeCodeRequest.setLanguage("java");
+
+        ExecuteCodeResponse executeCodeResponse = javaNativeCodeSandbox.executeCode(executeCodeRequest);
+        System.out.println(executeCodeResponse);
+
+    }
 
     @Override
-    public List<ExecuteMessage> runCode(List<String> inputList , File userCodeFile) {
+    public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
+        //请求资源，文件目录等信息
+        List<String> inputList = executeCodeRequest.getInputList();
+        String code = executeCodeRequest.getCode();
+        String language = executeCodeRequest.getLanguage();
+        String userDir = System.getProperty("user.dir");//获得项目根目录
+        String globalCodePathName = userDir + File.separator + GLOBAL_CODE_DIR_NANE;
+        String userCodeParentPath = globalCodePathName + File.separator + UUID.randomUUID();
+        String userCodePath = userCodeParentPath + File.separator + GLOBAL_JAVA_CLASS_NAME;
+        //收到用户传来的代码，执行代码
+        //用程序，代替人工，来操作命令行
+        //1 . 把代码保存为文件
+        File userCodeFile = SavaCodeFile(code , userCodePath);
+        //2 、编译代码
+        try {
+            Process compileProcess = Runtime.getRuntime().exec(COMPILE_CODE_CMD_PRO + userCodeFile.getAbsolutePath());
+            ExecuteMessage executeMessage = processUtils.runProcessAndGetMessage(compileProcess , "编译");
+            System.out.println(executeMessage);
+        } catch (Exception e) {
+            return getErrorResponse(e);
+        }
+
         //3.拉取一个java容器，然后把用户编译的代码放进去
         //获取默认的dockerClient
         DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+
         String image = "openjdk:8-alpine";
         //3.1. 拉取镜像
         if(first_init) {
@@ -67,7 +116,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate{
         HostConfig hostConfig = new HostConfig();//容器配置
         //bind就是和远程部署一样，Volume映射，把本地文件映射到容器中，让容器可以访问主机,把code父目录映射到/app
         //因此容器去访问/app下的main，就可以访问到文件了
-        hostConfig.setBinds(new Bind(userCodeFile.getParentFile().getAbsolutePath() , new Volume("/app")));
+        hostConfig.setBinds(new Bind(userCodeParentPath , new Volume("/app")));
         hostConfig.withMemory(1000*1000*1000L);//容器的内存，100M
         hostConfig.withMemorySwap(0L);//判题机当然禁止把内存里的值写到硬盘里来作弊
         hostConfig.withCpuCount(1L);
@@ -190,34 +239,45 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate{
             executeMessage.setMemory(maxMemory[0]);
             executeMessageList.add(executeMessage);
         }
+
+        //5. 整理结果
+        ExecuteCodeResponse executeCodeResponse = ExecuteMsg2Response.executeMsg2Response(executeMessageList);
         //返回结果
-        return executeMessageList;
+        return executeCodeResponse;
     }
-    // 新增测试用main方法
-    public static void main(String[] args) {
-        CodeSandbox sandbox = new JavaDockerCodeSandbox();
 
-        // 构造测试请求
-        ExecuteCodeRequest request = new ExecuteCodeRequest();
-        request.setLanguage("java");
-        request.setInputList(Arrays.asList("1 3", "1 4"));
+    /**
+     * 处理错误的，提升健壮性,如果出问题了，我都先返回这个类，至少能正常的往前端传一些简单的错误信息，而不是程序崩溃
+     * @param e
+     * @return
+     */
+    private ExecuteCodeResponse getErrorResponse(Throwable e){
+        ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
+        executeCodeResponse.setOutputList(new ArrayList<>());
+        executeCodeResponse.setMessage(e.getMessage());
+        executeCodeResponse.setStatus(2);//表示代码沙箱错误,我的程序出现了错误
+        executeCodeResponse.setJudgeInfo(new JudgeInfo());
+        return executeCodeResponse;
+    }
 
-        // 读取测试代码文件（需要准备测试文件）
-        String code = ResourceUtil.readStr("testCode/simpleComputeArgs/SimpleCompute.java", StandardCharsets.UTF_8);
-        request.setCode(code);
+    /**
+     * 将用户代码保存成文件
+     * @param code
+     * @return
+     */
+    public static File SavaCodeFile(String code , String savePath){
 
-        try {
-            ExecuteCodeResponse response = sandbox.executeCode(request);
-            System.out.println("执行状态: " + response.getStatus());
-            System.out.println("执行耗时: " + response.getJudgeInfo().getTime() + "ms");
-            System.out.println("内存占用: " + response.getJudgeInfo().getMemory() + "B");
-            System.out.println("输出结果: " + response.getOutputList());
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            // 清理临时文件（根据实际路径调整）
-//            FileUtil.del(new File("tmpCode"));
+        String userDir = System.getProperty("user.dir");//获得项目根目录
+        String globalCodePathName = userDir + File.separator + GLOBAL_CODE_DIR_NANE;
+        //先判断存代码的文件夹是否存在
+        if(!FileUtil.exist(globalCodePathName)) {
+            FileUtil.mkdir(globalCodePathName);//没有则新建
         }
+        //把用户的代码隔离存放
+        //用户的单独文件夹
+        File userCodeFile = FileUtil.writeString(code, savePath, StandardCharsets.UTF_8);
+
+        return userCodeFile;
     }
 
 }
