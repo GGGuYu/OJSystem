@@ -1,2 +1,12 @@
 server:
   port: 8090
+
+#微信相关禁用
+wx:
+  mp:
+    enabled: false
+
+#禁用数据库，因为我的代码沙箱服务不需要
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration

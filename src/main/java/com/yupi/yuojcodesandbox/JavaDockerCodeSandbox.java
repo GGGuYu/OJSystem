@@ -15,6 +15,7 @@ import com.github.dockerjava.core.command.ExecStartResultCallback;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeRequest;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeResponse;
 import com.yupi.yuojcodesandbox.model.ExecuteMessage;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 import java.io.Closeable;
 import java.io.File;
@@ -25,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+@Component("javaDockerCodeSandbox")
 public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate{
 
     private static final long TIME_OUT = 5000L;
@@ -32,6 +34,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate{
     private static  Boolean first_init = false;
 
 
+    //重写运行代码的逻辑，变成使用docker来运行代码
     @Override
     public List<ExecuteMessage> runCode(List<String> inputList , File userCodeFile) {
         //3.拉取一个java容器，然后把用户编译的代码放进去

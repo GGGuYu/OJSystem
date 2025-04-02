@@ -2,11 +2,13 @@ package com.yupi.yuojcodesandbox;
 import cn.hutool.core.io.resource.ResourceUtil;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeRequest;
 import com.yupi.yuojcodesandbox.model.ExecuteCodeResponse;
+import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 
+@Component
 public class JavaNativeCodeSandbox extends JavaCodeSandboxTemplate {
 
 
