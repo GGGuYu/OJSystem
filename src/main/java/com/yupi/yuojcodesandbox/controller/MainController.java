@@ -17,8 +17,10 @@ import javax.annotation.Resource;
 public class MainController {
 
     @Resource
-    @Qualifier("javaDockerCodeSandbox")
+    @Qualifier("javaDockerCodeSandboxOld")
     private CodeSandbox codeSandbox;
+//    @Resource
+//    private JavaDockerCodeSandbox codeSandbox;
 
     @GetMapping("health")
     public String healthCheck() {

@@ -15,6 +15,7 @@ import com.yupi.yuojcodesandbox.model.ExecuteMessage;
 import com.yupi.yuojcodesandbox.model.JudgeInfo;
 import com.yupi.yuojcodesandbox.utils.ExecuteMsg2Response;
 import com.yupi.yuojcodesandbox.utils.ProcessUtils;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
 import java.io.Closeable;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+@Component
 public class JavaDockerCodeSandboxOld implements CodeSandbox {
 
     private static final String GLOBAL_CODE_DIR_NANE = "tmpCode";
